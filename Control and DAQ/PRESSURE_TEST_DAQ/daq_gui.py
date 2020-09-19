@@ -1,6 +1,7 @@
 import sys, time, serial, matplotlib, random
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from collections import deque
 
 import numpy as np
 
@@ -36,9 +37,13 @@ def init_gui():
     plot_size = 500
 
     x_values = [i for i in range(plot_size)]
-    p1_values = [0 for i in range(plot_size)]
-    p2_values = [0 for i in range(plot_size)]
-    p3_values = [0 for i in range(plot_size)]		# Dynamic plot setup
+    # p1_values = [0 for i in range(plot_size)]
+    # p2_values = [0 for i in range(plot_size)]
+    # p3_values = [0 for i in range(plot_size)]		# Dynamic plot setup
+
+    p1_values = deque(np.zeros(plot_size))
+    p2_values = deque(np.zeros(plot_size))
+    p3_values = deque(np.zeros(plot_size))
 
     # plt.ion()
     fig = plt.figure(figsize=(20,7))
@@ -124,24 +129,24 @@ def daq_toggle():
 
 def update_plot(new_p1, new_p2, new_p3):
 
+    p1_values.popleft()
+    p2_values.popleft()
+    p3_values.popleft()
+
     if new_p1 == None:
-        new_value = p1_values[plot_size-1]
+        p1_values.append(p1_values[len(p1_values)-1])
+    else:
+        p1_values.append(new_p1)
 
     if new_p2 == None:
-        new_p2 = p2_values[plot_size-1]
+        p2_values.append(p2_values[len(p2_values)-1])
+    else:
+        p2_values.append(new_p2)
 
     if new_p3 == None:
-        new_p3 = p3_values[plot_size-1]
-
-    for i in range(0, plot_size-1):
-        p1_values[i] = p1_values[i+1]
-        p2_values[i] = p2_values[i+1]
-        p3_values[i] = p3_values[i+1]
-
-
-    p1_values[plot_size-1] = new_p1
-    p2_values[plot_size-1] = new_p2
-    p3_values[plot_size-1] = new_p3
+        p3_values.append(p3_values[len(p3_values)-1])
+    else:
+        p3_values.append(new_p3)
 
     line1.set_ydata(p1_values)
     line2.set_ydata(p2_values)
@@ -177,6 +182,8 @@ def mcu_loop():
     i = 0
 
     while True:
+        # start = time.time()
+
         try:
             data = str(ser.readline()[:-2].decode("utf-8"))
             ser.flush()
@@ -187,7 +194,12 @@ def mcu_loop():
                 # print("Timestamp:{}\tPressure1:{}\tPressure2:{}\tPressure3:{}"
                 # .format(tStamp, val1, val2, val3))
 
+                plot_start = time.time()
+
                 update_plot(int(val1), int(val2), int(val3))
+
+                plot_end = time.time()
+                print("Plot Max Refresh Rate: " + str(1/(plot_end-plot_start)) + " Hz")
 
                 ser.flush()
 
@@ -206,8 +218,8 @@ def mcu_loop():
         except ValueError:
             ser.flush()
 
-    # end = time.time()
-    # print("Refresh Rate: " + str(1/(end-start)) + " Hz")
+        # end = time.time()
+        # print("Refresh Rate: " + str(1/(end-start)) + " Hz")
 
 
 if __name__ == "__main__":
