@@ -34,13 +34,9 @@ def init_gui():
 
     global daq_toggle_button
 
-    plot_size = 500
+    plot_size = 1000
 
     x_values = [i for i in range(plot_size)]
-    # p1_values = [0 for i in range(plot_size)]
-    # p2_values = [0 for i in range(plot_size)]
-    # p3_values = [0 for i in range(plot_size)]		# Dynamic plot setup
-
     p1_values = deque(np.zeros(plot_size))
     p2_values = deque(np.zeros(plot_size))
     p3_values = deque(np.zeros(plot_size))
@@ -53,10 +49,10 @@ def init_gui():
     ax1.set_ylim(0, 8300)
     ax1.set_yticks([0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000])
     ax1.axhline(8192, color="r", linestyle="--", linewidth=0.7)
-    line1, = ax1.plot(x_values, p1_values, 'r-', linewidth=0.8)
-    line2, = ax1.plot(x_values, p2_values, 'g-', linewidth=0.8)
-    line3, = ax1.plot(x_values, p3_values, 'b-', linewidth=0.8)
-    plt.grid()
+    line1, = ax1.plot(x_values, p1_values, 'r-', linewidth=0.6)
+    line2, = ax1.plot(x_values, p2_values, 'g-', linewidth=0.6)
+    line3, = ax1.plot(x_values, p3_values, 'b-', linewidth=0.6)
+    # plt.grid()
 
     root = tk.Tk()
     root.protocol("WM_DELETE_WINDOW", _quit)
@@ -152,11 +148,6 @@ def update_plot(new_p1, new_p2, new_p3):
     line2.set_ydata(p2_values)
     line3.set_ydata(p3_values)
 
-    # try:
-    #     fig.canvas.draw()
-    # except:
-    #     pass
-
     fig.canvas.draw()
 
     fig.canvas.flush_events()
@@ -182,7 +173,7 @@ def mcu_loop():
     i = 0
 
     while True:
-        # start = time.time()
+        start = time.time()
 
         try:
             data = str(ser.readline()[:-2].decode("utf-8"))
@@ -194,12 +185,12 @@ def mcu_loop():
                 # print("Timestamp:{}\tPressure1:{}\tPressure2:{}\tPressure3:{}"
                 # .format(tStamp, val1, val2, val3))
 
-                plot_start = time.time()
+                # plot_start = time.time()
 
                 update_plot(int(val1), int(val2), int(val3))
 
-                plot_end = time.time()
-                print("Plot Max Refresh Rate: " + str(1/(plot_end-plot_start)) + " Hz")
+                # plot_end = time.time()
+                # print("Plot Max Refresh Rate: " + str(1/(plot_end-plot_start)) + " Hz")
 
                 ser.flush()
 
@@ -218,8 +209,8 @@ def mcu_loop():
         except ValueError:
             ser.flush()
 
-        # end = time.time()
-        # print("Refresh Rate: " + str(1/(end-start)) + " Hz")
+        end = time.time()
+        print("Refresh Rate: " + str(1/(end-start)) + " Hz")
 
 
 if __name__ == "__main__":

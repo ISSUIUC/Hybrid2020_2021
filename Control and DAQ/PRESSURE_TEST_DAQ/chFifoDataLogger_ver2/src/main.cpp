@@ -136,7 +136,7 @@ void mainThread() {
     }
 
     // Don't print every cycle to avoid saturating Serial buffer
-    if (q >= 500000) {
+    if (q >= 300000) {
       q = 0;
       Serial.print(micros());
       Serial.print("\t");
@@ -182,8 +182,8 @@ void mainThread() {
     FifoItem_t* p = &fifoArray[fifoTail];
     if (fifoTail >= FIFO_SIZE) fifoTail = 0;
 
-    // Display real time pressure every 100 data acquisitions
-    if(i >= 50 && Serial.availableForWrite()){
+    // Display real time pressure at ~ 30.03 Hz
+    if(i >= 33 && Serial.availableForWrite()){
       i=0;
       //Serial.println(p->value*0.016337764-0.300943842);
       Serial.print(p->usec);
