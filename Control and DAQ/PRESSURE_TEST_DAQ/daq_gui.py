@@ -224,7 +224,7 @@ if __name__ == "__main__":
 
     update_plot(0, 0, 0)
 
-    ser = serial.Serial("/dev/ttyACM0", 9600, timeout=1)
+    ser = serial.Serial("/dev/ttyUSB0", 57600, timeout=1)
 
     try:
         mcu_loop()

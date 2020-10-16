@@ -7,7 +7,7 @@
 // The FIFO uses two semaphores to synchronize between tasks.
 
 // Interval between points in units of 1024 usec on AVR, usec on ARM.
-const systime_t intervalTicks = TIME_US2I(1000);
+const systime_t intervalTicks = TIME_US2I(500);
 //const systime_t intervalTicks = 1;
 
 //------------------------------------------------------------------------------
@@ -55,6 +55,9 @@ static THD_FUNCTION(Thread1, arg) {
   while (true) {
     logTimeTicks += intervalTicks;
     chThdSleepUntil(logTimeTicks);
+
+    digitalWrite(33, HIGH);
+
     // Get a buffer.
     if (chSemWaitTimeout(&fifoSpace, TIME_IMMEDIATE) != MSG_OK) {
       // Fifo full, indicate missed point.
@@ -72,6 +75,8 @@ static THD_FUNCTION(Thread1, arg) {
     // Counting up at every data acquisition
     i++;
 
+    digitalWrite(33, LOW);
+
     // Signal new data.
     chSemSignal(&fifoData);
 
@@ -87,9 +92,13 @@ void setup() {
 
   analogReadResolution(13);
   Serial.begin(9600);
+  Serial1.begin(57600);
+
+  pinMode(33, OUTPUT);
+  pinMode(35, OUTPUT);
 
   // Wait for USB Serial.
-  while (!Serial) {}
+  // while (!Serial) {}
 
   // Start kernel
   chBegin(mainThread);
@@ -120,23 +129,27 @@ void mainThread() {
   pinMode(LED_BUILTIN, OUTPUT);
 
   Serial.println(F("Send start message to begin ('a' = 0x61)"));
+  Serial1.println(F("Send start message to begin ('a' = 0x61)"));
+
 
   // Print sensors to Serial port while waiting for start message
   int q = 0;
   while(true) {
 
-    if (Serial.available()) {
-      if (Serial.read() == 0x61) {
+    if (Serial.available() || Serial1.available()) {
+      if (Serial.read() == 0x61 || Serial1.read() == 0x61) {
         // LED on to indicate recording
         digitalWrite(LED_BUILTIN, HIGH);
         break;
       } else {
         Serial.flush();
+        Serial1.flush();
       }
     }
 
     // Don't print every cycle to avoid saturating Serial buffer
-    if (q >= 300000) {
+    // 200000 ~= 24.75 Hz measured with oscilloscope.
+    if (q >= 200000) {
       q = 0;
       Serial.print(micros());
       Serial.print("\t");
@@ -145,6 +158,14 @@ void mainThread() {
       Serial.print(analogRead(A6));
       Serial.print("\t");
       Serial.println(analogRead(A5));
+
+      Serial1.print(micros());
+      Serial1.print("\t");
+      Serial1.print(analogRead(A7));
+      Serial1.print("\t");
+      Serial1.print(analogRead(A6));
+      Serial1.print("\t");
+      Serial1.println(analogRead(A5));
     }
 
     ++q;
@@ -167,32 +188,43 @@ void mainThread() {
   // SD write loop.
   while (true) {
 
-    if (Serial.available()) {
-      if (Serial.read() == 0x62) {
+    if (Serial.available() || Serial1.available()) {
+      if (Serial.read() == 0x62 || Serial1.read() == 0x62) {
         digitalWrite(LED_BUILTIN, LOW);
         break;
       } else {
         Serial.flush();
+        Serial1.flush();
       }
     }
 
     // Wait for next data point.
     chSemWait(&fifoData);
 
+    digitalWrite(35, HIGH);
+
     FifoItem_t* p = &fifoArray[fifoTail];
     if (fifoTail >= FIFO_SIZE) fifoTail = 0;
 
     // Display real time pressure at ~ 30.03 Hz
-    if(i >= 33 && Serial.availableForWrite()){
+    if(i >= 33){
       i=0;
       //Serial.println(p->value*0.016337764-0.300943842);
-      Serial.print(p->usec);
-      Serial.print("\t");
-      Serial.print(p->value1);
-      Serial.print("\t");
-      Serial.print(p->value2);
-      Serial.print("\t");
-      Serial.println(p->value3);
+      // Serial.print(p->usec);
+      // Serial.print("\t");
+      // Serial.print(p->value1);
+      // Serial.print("\t");
+      // Serial.print(p->value2);
+      // Serial.print("\t");
+      // Serial.println(p->value3);
+
+      Serial1.print(p->usec);
+      Serial1.print("\t");
+      Serial1.print(p->value1);
+      Serial1.print("\t");
+      Serial1.print(p->value2);
+      Serial1.print("\t");
+      Serial1.println(p->value3);
 
       // char* buf = (char)p;
       //
@@ -217,6 +249,8 @@ void mainThread() {
 
     // Remember error.
     if (p->error) overrunError = true;
+
+    digitalWrite(35, LOW);
 
     // Release record.
     chSemSignal(&fifoSpace);
