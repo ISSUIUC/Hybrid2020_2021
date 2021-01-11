@@ -98,13 +98,22 @@ def init_gui():
     serial_frame = tk.Frame(primary_frame)
 
     daq_toggle_button = tk.Button(serial_frame, text="TOGGLE DAQ", height=3, width = 20, command=lambda: daq_toggle())
-    daq_toggle_button.config({"background" : "red"})
+    daq_toggle_button.config({"background" : "green3"})
     daq_toggle_button.config({"justify" : "center"})
-    daq_toggle_button.grid(row=2, column=1)
+    daq_toggle_button.grid(row=1, column=1)
+
+    vent_button = tk.Button(serial_frame, text="VENT", height=3, width = 20, command=lambda: vent_toggle())
+    vent_button.config({"background" : "red"})
+    vent_button.config({"justify" : "center"})
+    vent_button.grid(row=3, column=1)
 
     serial_frame.grid(row=1, column=1)
 
     primary_frame.pack()
+
+def vent_toggle():
+    global ser
+    ser.write("c".encode("utf-8"))
 
 
 def daq_toggle():
@@ -113,12 +122,12 @@ def daq_toggle():
 
     if DAQ_ENABLE:
         ser.write("b".encode("utf-8"))
-        daq_toggle_button.config({"background" : "red"})
+        daq_toggle_button.config({"background" : "green3"})
         daq_toggle_button.config({"justify" : "center"})
         DAQ_ENABLE = False
     else:
         ser.write("a".encode("utf-8"))
-        daq_toggle_button.config({"background" : "green3"})
+        daq_toggle_button.config({"background" : "red"})
         daq_toggle_button.config({"justify" : "center"})
         DAQ_ENABLE = True
 
@@ -182,8 +191,8 @@ def mcu_loop():
             if data:
                 tStamp, val1, val2, val3 = data.split("\t")
 
-                # print("Timestamp:{}\tPressure1:{}\tPressure2:{}\tPressure3:{}"
-                # .format(tStamp, val1, val2, val3))
+                print("Timestamp:{}\tPressure1:{}\tPressure2:{}\tPressure3:{}"
+                .format(tStamp, val1, val2, val3))
 
                 # plot_start = time.time()
 
@@ -224,7 +233,8 @@ if __name__ == "__main__":
 
     update_plot(0, 0, 0)
 
-    ser = serial.Serial("/dev/ttyUSB0", 57600, timeout=1)
+    ser = serial.Serial("/dev/ttyUSB0", 57600, timeout=1) # Telemetry
+    # ser = serial.Serial("/dev/ttyACM0", 9600, timeout=1)
 
     try:
         mcu_loop()

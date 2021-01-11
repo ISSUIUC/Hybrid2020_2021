@@ -11,14 +11,20 @@
 #include <SD.h>
 #include <ChRt.h>
 
+#include "pins.h"
+#include "dataLog.h"
+
 #define PRINT_USB 1
 #define PRINT_TLM 0
 
 #define READ_INTERVAL_US    1000
-#define READ_TICKS          (chTimeUS2I(READ_INTERVAL_US))
+// #define READ_TICKS          (chTimeUS2I(READ_INTERVAL_US))
+#define READ_TICKS          TIME_US2I(READ_INTERVAL_US)
 
 #define FIFO_SIZE           10000
 #define ADC_RESOLUTION      13
+
+File dataFile;
 
 // static uint32_t counter = 0;
 static uint8_t exit_msg = 0;
@@ -26,41 +32,56 @@ static uint8_t exit_msg = 0;
 SEMAPHORE_DECL(fifoData, 0);
 SEMAPHORE_DECL(fifoSpace, FIFO_SIZE);
 
-typedef struct {
-    uint32_t usec;
-    uint16_t value1;
-    uint16_t value2;
-    uint16_t value3;
-    uint16_t errors;
-} FifoItem_t;
-
 static FifoItem_t fifoArray[FIFO_SIZE];
 
-/* ------------------------------  UART ISR  -------------------------------- */
+enum DAQ_State {
+    IDLE,
+    RECORDING,
+    VENTING
+};
+
+DAQ_State DAQState;
+
+/* -----------------------------  UART0 ISR  -------------------------------- */
 /* -------------------------------------------------------------------------- */
-// Doesnt work yet :(
 
-void uart0_irqhandler(void) {
+// original handler to be called before anything else
+void (*orig_uart0_irqhandler)(void);
 
-    Serial.println("woo irqhandler triggered.");
-    digitalWrite(LED_BUILTIN, HIGH);
-    delay(500);
-    digitalWrite(LED_BUILTIN, LOW);
+// void custom_uart0_irqhandler(void) {
+CH_FAST_IRQ_HANDLER(custom_uart0_irqhandler) {
+    // CH_IRQ_PROLOGUE();
 
-    // if (UART0_S1 & (UART_S1_RDRF | UART_S1_IDLE)) {
-    //     Serial.println("woo irqhandler triggered.");
-    //     digitalWrite(LED_BUILTIN, HIGH);
-    //     delay(100);
-    //     digitalWrite(LED_BUILTIN, LOW);
-    // }
+    // Original handler must be called first as it handles RX/TX buffering
+    orig_uart0_irqhandler();
 
+    if (Serial1.available()) {
+
+        uint8_t cmd = Serial1.read();
+
+        switch (cmd) {
+            case 0x61:
+                DAQState = IDLE;
+                break;
+            case 0x62:
+                DAQState = RECORDING;
+                break;
+            case 0x63:
+                DAQState = VENTING;
+                digitalWrite(HYBRID_VENT_PIN, HIGH);
+                digitalWrite(LED_BUILTIN, HIGH);
+                break;
+        }
+
+    }
+    // CH_IRQ_EPILOGUE();
 }
 
 /* -----------------------------  ADC THREAD  ------------------------------- */
 /* -------------------------------------------------------------------------- */
 
-// Declare a stack with 32 bytes beyond task switch and interrupt needs.
-static THD_WORKING_AREA(adc_thread_wa, 32);
+// Declare a stack with 64 bytes beyond task switch and interrupt needs.
+static THD_WORKING_AREA(adc_thread_wa, 64);
 
 static THD_FUNCTION(adc_thread, arg) {
 
@@ -69,99 +90,76 @@ static THD_FUNCTION(adc_thread, arg) {
 
     systime_t log_time = chVTGetSystemTime();   // Get current system time
 
+    uint16_t count = 0;
+
+    FifoItem_t data;
+
     while (true) {
+
+        data.usec = micros();
+        data.value1 = analogRead(HYBRID_PT_1_PIN);
+        data.value2 = analogRead(HYBRID_PT_2_PIN);
+        data.value3 = analogRead(HYBRID_PT_3_PIN);
+        data.errors = errors;
+
+        // Display real time dataressure at ~ 30.03 Hz
+        if(count >= 50){
+            count = 0;
+            Serial1.print(data.usec);
+            Serial1.print("\t");
+            Serial1.print(data.value1);
+            Serial1.print("\t");
+            Serial1.print(data.value2);
+            Serial1.print("\t");
+            Serial1.print(data.value3);
+            Serial1.print("\t");
+            Serial1.println(data.errors);
+        }
+        ++count;
 
         // Sleep until next read time is reached
         log_time = chTimeAddX(log_time, READ_TICKS);
         chThdSleepUntil(log_time);
 
-        if (chSemWaitTimeout(&fifoSpace, TIME_IMMEDIATE) != MSG_OK) {
-            errors++;
-            continue;
+        if (DAQState == RECORDING) {
+
+            if (chSemWaitTimeout(&fifoSpace, TIME_IMMEDIATE) != MSG_OK) {
+                errors++;
+                continue;
+            }
+
+            fifoArray[fifoHead] = data;
+            errors = 0;
+
+            fifoHead = fifoHead < (FIFO_SIZE - 1) ? fifoHead + 1 : 0;
+
+            chSemSignal(&fifoData);
         }
-
-        FifoItem_t* p = &fifoArray[fifoHead];
-        p->usec = micros();
-        p->value1 = analogRead(A7);
-        p->value2 = analogRead(A6);
-        p->value3 = analogRead(A5);
-        p->errors = errors;
-        errors = 0;
-
-        fifoHead = fifoHead < (FIFO_SIZE - 1) ? fifoHead + 1 : 0;
-
-        chSemSignal(&fifoData);
     }
 }
 
 /* ----------------------------  MAIN THREAD  ------------------------------- */
 /* -------------------------------------------------------------------------- */
 
-int main(void) {
-
-    pinMode(LED_BUILTIN, OUTPUT);
-    pinMode(A5, INPUT);
-    pinMode(A6, INPUT);
-    pinMode(A7, INPUT);
-
-    Serial.begin(9600);
-    Serial1.begin(57600);
-
-    // while (!Serial) {}
-    // while (!Serial1) {}
-
-    digitalWrite(LED_BUILTIN, HIGH);
-    delay(100);
-    digitalWrite(LED_BUILTIN, LOW);
-
-    Serial.println("hello there");
-    Serial1.println("hello telemetry!");
-
-    attachInterruptVector(IRQ_UART1_STATUS, uart0_irqhandler);
-    NVIC_SET_PRIORITY(IRQ_UART1_STATUS, 1);
-    NVIC_ENABLE_IRQ(IRQ_UART1_STATUS);
-
-    Serial.println("IRQ Handler set!");
-    Serial1.println("telemetry IRQ handler set!");
-
-    analogReadResolution(ADC_RESOLUTION);
-
-    Serial.printf("Size of FifoItem_t is: %d bytes", sizeof(FifoItem_t));
-    Serial.println();
+void mainThread() {
 
     uint16_t fifoTail = 0;
     uint16_t last = 0;
 
-    // Open file.
-    File file;
-    if (!SD.begin(BUILTIN_SDCARD)) {
-        Serial.println(F("SD begin failed."));
-        while (true) {}
-    }
-
-    file = SD.open("dataFile.CSV", O_CREAT | O_WRITE | O_TRUNC);
-    if (!file) {
-        Serial.println(F("file open  failed."));
-        while (true) {}
-    }
-
+    // Create ADC producer thread
     chThdCreateStatic(adc_thread_wa, sizeof(adc_thread_wa), NORMALPRIO+1,
                       adc_thread, NULL);
-
-    chSysInit();
 
     while (true) {
 
         chSemWait(&fifoData);
+        // if (chSemWaitTimeout(&fifoData, TIME_IMMEDIATE) != MSG_OK) {
+        //     continue;
+        // }
 
-        FifoItem_t* p = &fifoArray[fifoTail];
-        file.print(p->usec);
-        file.write(',');
-        file.print(p->value1);
-        file.write(',');
-        file.print(p->value2);
-        file.write(',');
-        file.print(p->value3);
+        FifoItem_t* data = &fifoArray[fifoTail];
+
+        logData(&dataFile, data);
 
         chSemSignal(&fifoSpace);
 
@@ -169,8 +167,58 @@ int main(void) {
 
     }
 
-    file.close();
+    dataFile.close();
 
-    return 0;
+}
+
+/* -------------------------------  SETUP  ---------------------------------- */
+/* -------------------------------------------------------------------------- */
+
+ void setup() {
+
+     pinMode(LED_BUILTIN, OUTPUT);
+     pinMode(A5, INPUT);
+     pinMode(A6, INPUT);
+     pinMode(A7, INPUT);
+     analogReadResolution(ADC_RESOLUTION);
+
+     Serial.begin(9600);
+     Serial1.begin(57600);
+
+     // while (!Serial) {}
+     // while (!Serial1) {}
+
+     //SD Card Setup
+     if(!SD.begin(BUILTIN_SDCARD)){
+         while (true) {
+             Serial.println("### SD.begin failed! ###");
+             digitalWrite(LED_BUILTIN, LOW);
+             delay(300);
+             digitalWrite(LED_BUILTIN, HIGH);
+             delay(300);
+         }
+     }
+
+     init_dataLog(&dataFile);
+
+     if (!dataFile) {
+         Serial1.println(F("### File open failed! ###"));
+         while (true) {
+             digitalWrite(LED_BUILTIN, LOW);
+             delay(300);
+             digitalWrite(LED_BUILTIN, HIGH);
+             delay(300);
+         }
+     }
+
+     // interrupt chaining by replacing NVIC vector to point to custom handler
+     orig_uart0_irqhandler = _VectorsRam[IRQ_UART0_STATUS+16];
+     _VectorsRam[IRQ_UART0_STATUS+16] = custom_uart0_irqhandler;
+
+     chBegin(mainThread);
 
  }
+
+void loop() {
+
+}
