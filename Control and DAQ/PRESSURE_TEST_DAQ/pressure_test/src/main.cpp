@@ -10,6 +10,7 @@
 
 #include <SD.h>
 #include <ChRt.h>
+#include <Servo.h>
 
 #include "pins.h"
 #include "dataLog.h"
@@ -34,13 +35,12 @@ SEMAPHORE_DECL(fifoSpace, FIFO_SIZE);
 
 static FifoItem_t fifoArray[FIFO_SIZE];
 
-enum DAQ_State {
-    IDLE,
-    RECORDING,
-    VENTING
-};
+bool DAQState = false;
+bool ventState = false;
+bool valveState = false;
 
-DAQ_State DAQState;
+Servo BV_Servo1;
+Servo BV_Servo2;
 
 /* -----------------------------  UART0 ISR  -------------------------------- */
 /* -------------------------------------------------------------------------- */
@@ -61,15 +61,29 @@ CH_FAST_IRQ_HANDLER(custom_uart0_irqhandler) {
 
         switch (cmd) {
             case 0x61:
-                DAQState = IDLE;
+                DAQState = true;
                 break;
             case 0x62:
-                DAQState = RECORDING;
+                DAQState = false;
                 break;
             case 0x63:
-                DAQState = VENTING;
-                digitalWrite(HYBRID_VENT_PIN, HIGH);
-                digitalWrite(LED_BUILTIN, HIGH);
+                if (ventState) {
+                    ventState = false;
+                    digitalWrite(HYBRID_VENT_PIN, LOW);
+                    digitalWrite(LED_BUILTIN, LOW);
+                } else {
+                    ventState = true;
+                    digitalWrite(HYBRID_VENT_PIN, HIGH);
+                    digitalWrite(LED_BUILTIN, HIGH);
+                }
+                break;
+            case 0x64:
+                BV_Servo1.write(180.0);
+                BV_Servo2.write(180.0);
+                break;
+            case 0x65:
+                BV_Servo1.write(0.0);
+                BV_Servo2.write(0.0);
                 break;
         }
 
@@ -121,7 +135,7 @@ static THD_FUNCTION(adc_thread, arg) {
         log_time = chTimeAddX(log_time, READ_TICKS);
         chThdSleepUntil(log_time);
 
-        if (DAQState == RECORDING) {
+        if (DAQState) {
 
             if (chSemWaitTimeout(&fifoSpace, TIME_IMMEDIATE) != MSG_OK) {
                 errors++;
@@ -182,11 +196,16 @@ void mainThread() {
      pinMode(A7, INPUT);
      analogReadResolution(ADC_RESOLUTION);
 
+     BV_Servo1.attach(BALL_VALVE_1_PIN);
+     BV_Servo2.attach(BALL_VALVE_2_PIN);
+     BV_Servo1.write(0.0);
+     BV_Servo2.write(0.0);
+
      Serial.begin(9600);
      Serial1.begin(57600);
 
      // while (!Serial) {}
-     // while (!Serial1) {}
+     while (!Serial1) {}
 
      //SD Card Setup
      if(!SD.begin(BUILTIN_SDCARD)){

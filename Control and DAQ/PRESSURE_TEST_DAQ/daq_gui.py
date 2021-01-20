@@ -33,6 +33,8 @@ def init_gui():
     global line3
 
     global daq_toggle_button
+    global vent_button
+    global ballvalve_button
 
     plot_size = 1000
 
@@ -98,22 +100,56 @@ def init_gui():
     serial_frame = tk.Frame(primary_frame)
 
     daq_toggle_button = tk.Button(serial_frame, text="TOGGLE DAQ", height=3, width = 20, command=lambda: daq_toggle())
-    daq_toggle_button.config({"background" : "green3"})
+    daq_toggle_button.config({"background" : "red"})
     daq_toggle_button.config({"justify" : "center"})
-    daq_toggle_button.grid(row=1, column=1)
+    daq_toggle_button.grid(row=1, column=1, pady=5)
 
     vent_button = tk.Button(serial_frame, text="VENT", height=3, width = 20, command=lambda: vent_toggle())
     vent_button.config({"background" : "red"})
     vent_button.config({"justify" : "center"})
-    vent_button.grid(row=3, column=1)
+    vent_button.grid(row=2, column=1, pady=5)
+
+    ballvalve_button = tk.Button(serial_frame, text="BALL VALVE", height=3, width = 20, command=lambda: valve_toggle())
+    ballvalve_button.config({"background" : "red"})
+    ballvalve_button.config({"justify" : "center"})
+    ballvalve_button.grid(row=3, column=1, pady=5)
 
     serial_frame.grid(row=1, column=1)
 
     primary_frame.pack()
 
+
+def valve_toggle():
+    global ser
+    global VALVE_OPEN
+    global ballvalve_button
+
+    if VALVE_OPEN:
+        ser.write("e".encode("utf-8"))
+        ballvalve_button.config({"background" : "red"})
+        ballvalve_button.config({"justify" : "center"})
+        VALVE_OPEN = False
+    else:
+        ser.write("d".encode("utf-8"))
+        ballvalve_button.config({"background" : "green3"})
+        ballvalve_button.config({"justify" : "center"})
+        VALVE_OPEN = True
+
+
 def vent_toggle():
     global ser
-    ser.write("c".encode("utf-8"))
+    global VENT_OPEN
+
+    if VENT_OPEN:
+        ser.write("c".encode("utf-8"))
+        vent_button.config({"background" : "red"})
+        vent_button.config({"justify" : "center"})
+        VENT_OPEN = False
+    else:
+        ser.write("c".encode("utf-8"))
+        vent_button.config({"background" : "green3"})
+        vent_button.config({"justify" : "center"})
+        VENT_OPEN = True
 
 
 def daq_toggle():
@@ -122,12 +158,12 @@ def daq_toggle():
 
     if DAQ_ENABLE:
         ser.write("b".encode("utf-8"))
-        daq_toggle_button.config({"background" : "green3"})
+        daq_toggle_button.config({"background" : "red"})
         daq_toggle_button.config({"justify" : "center"})
         DAQ_ENABLE = False
     else:
         ser.write("a".encode("utf-8"))
-        daq_toggle_button.config({"background" : "red"})
+        daq_toggle_button.config({"background" : "green3"})
         daq_toggle_button.config({"justify" : "center"})
         DAQ_ENABLE = True
 
@@ -189,7 +225,7 @@ def mcu_loop():
             ser.flush()
 
             if data:
-                tStamp, val1, val2, val3 = data.split("\t")
+                tStamp, val1, val2, val3, errors = data.split("\t")
 
                 print("Timestamp:{}\tPressure1:{}\tPressure2:{}\tPressure3:{}"
                 .format(tStamp, val1, val2, val3))
@@ -226,8 +262,12 @@ if __name__ == "__main__":
 
     global ser
     global DAQ_ENABLE
+    global VALVE_OPEN
+    global VENT_OPEN
 
     DAQ_ENABLE = False
+    VALVE_OPEN = False
+    VENT_OPEN = False
 
     init_gui()
 
