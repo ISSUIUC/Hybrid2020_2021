@@ -40,7 +40,7 @@ void init_dataLog(File* dataFile) {
 
     Serial.println(fileName);
     *dataFile = SD.open(fileName, O_CREAT | O_WRITE | O_TRUNC);
-    dataFile->println("usec, value1, value2, value3, errors");
+    dataFile->println("usec, RAW_PT1, RAW_PT2, RAW_PT3, errors");
 
 }
 
@@ -54,7 +54,9 @@ void logData(File* dataFile, FifoItem_t* data) {
     dataFile->print(data->value2);
     dataFile->write(',');
     dataFile->print(data->value3);
+    dataFile->write(',');
+    dataFile->println(data->errors);
 
     //Writing line of data to SD card
-    // dataFile->flush();
+    dataFile->flush();
 }

@@ -22,7 +22,7 @@
 // #define READ_TICKS          (chTimeUS2I(READ_INTERVAL_US))
 #define READ_TICKS          TIME_US2I(READ_INTERVAL_US)
 
-#define FIFO_SIZE           10000
+#define FIFO_SIZE           20000
 #define ADC_RESOLUTION      13
 
 File dataFile;
@@ -62,26 +62,33 @@ CH_FAST_IRQ_HANDLER(custom_uart0_irqhandler) {
         switch (cmd) {
             case 0x61:
                 DAQState = true;
+                digitalWrite(LED_BLUE, HIGH);
                 break;
             case 0x62:
                 DAQState = false;
+                digitalWrite(LED_BLUE, LOW);
                 break;
             case 0x63:
                 if (ventState) {
                     ventState = false;
                     digitalWrite(HYBRID_VENT_PIN, LOW);
-                    digitalWrite(LED_BUILTIN, LOW);
+                    digitalWrite(LED_RED, LOW);
                 } else {
                     ventState = true;
                     digitalWrite(HYBRID_VENT_PIN, HIGH);
-                    digitalWrite(LED_BUILTIN, HIGH);
+                    digitalWrite(LED_RED, HIGH);
                 }
                 break;
             case 0x64:
+                valveState = true;
+                digitalWrite(LED_ORANGE, HIGH);
                 BV_Servo1.write(180.0);
                 BV_Servo2.write(180.0);
                 break;
             case 0x65:
+                valveState = false;
+                digitalWrite(LED_ORANGE, LOW);
+                digitalWrite(LED_BUILTIN, LOW);
                 BV_Servo1.write(0.0);
                 BV_Servo2.write(0.0);
                 break;
@@ -139,6 +146,7 @@ static THD_FUNCTION(adc_thread, arg) {
 
             if (chSemWaitTimeout(&fifoSpace, TIME_IMMEDIATE) != MSG_OK) {
                 errors++;
+                digitalWrite(LED_BUILTIN, HIGH);
                 continue;
             }
 
@@ -191,9 +199,13 @@ void mainThread() {
  void setup() {
 
      pinMode(LED_BUILTIN, OUTPUT);
-     pinMode(A5, INPUT);
-     pinMode(A6, INPUT);
-     pinMode(A7, INPUT);
+     pinMode(LED_WHITE, OUTPUT);
+     pinMode(LED_ORANGE, OUTPUT);
+     pinMode(LED_RED, OUTPUT);
+     pinMode(LED_BLUE, OUTPUT);
+     pinMode(HYBRID_PT_1_PIN, INPUT);
+     pinMode(HYBRID_PT_2_PIN, INPUT);
+     pinMode(HYBRID_PT_3_PIN, INPUT);
      analogReadResolution(ADC_RESOLUTION);
 
      BV_Servo1.attach(BALL_VALVE_1_PIN);
@@ -229,6 +241,8 @@ void mainThread() {
              delay(300);
          }
      }
+
+     digitalWrite(LED_WHITE, HIGH);
 
      // interrupt chaining by replacing NVIC vector to point to custom handler
      orig_uart0_irqhandler = _VectorsRam[IRQ_UART0_STATUS+16];
