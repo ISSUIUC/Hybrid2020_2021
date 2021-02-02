@@ -82,8 +82,8 @@ CH_FAST_IRQ_HANDLER(custom_uart0_irqhandler) {
             case 0x64:
                 valveState = true;
                 digitalWrite(LED_ORANGE, HIGH);
-                BV_Servo1.write(180.0);
-                BV_Servo2.write(180.0);
+                BV_Servo1.write(140.0);
+                BV_Servo2.write(140.0);
                 break;
             case 0x65:
                 valveState = false;
