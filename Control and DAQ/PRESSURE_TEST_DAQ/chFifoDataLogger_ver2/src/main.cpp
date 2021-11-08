@@ -41,7 +41,7 @@ struct FifoItem_t {
 FifoItem_t fifoArray[FIFO_SIZE];
 //------------------------------------------------------------------------------
 // Declare a stack with 32 bytes beyond task switch and interrupt needs.
-static THD_WORKING_AREA(waThread1, 32);
+static THD_WORKING_AREA(waThread1, 8000);
 
 static THD_FUNCTION(Thread1, arg) {
   (void)arg;
