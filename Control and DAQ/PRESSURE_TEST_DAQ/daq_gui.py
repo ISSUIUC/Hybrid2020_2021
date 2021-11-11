@@ -46,8 +46,8 @@ def init_gui():
     ax1 = fig.add_subplot(111)
     ax1.set_title("Pressure Readings")
     ax1.set_xlim(0, plot_size)
-    ax1.set_ylim(0, 8300)
-    ax1.set_yticks([0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000])
+    ax1.set_ylim(0, 1100)
+    ax1.set_yticks([0, 100, 200, 300, 400, 500, 600, 700, 800,900,1000,1100])
     ax1.axhline(8192, color="r", linestyle="--", linewidth=0.7)
     line1, = ax1.plot(x_values, p1_values, 'r-', linewidth=0.6)
     line2, = ax1.plot(x_values, p2_values, 'g-', linewidth=0.6)
@@ -187,16 +187,16 @@ def mcu_loop():
 
                 # plot_start = time.time()
 
-                update_plot(int(val1), int(val2), int(val3))
+                update_plot(float(val1), float(val2), float(val3))
 
                 # plot_end = time.time()
                 # print("Plot Max Refresh Rate: " + str(1/(plot_end-plot_start)) + " Hz")
 
                 ser.flush()
 
-            # update_plot(np.sin(i)*3000 + 4000, np.cos(i)*500 + 3000, 2000)
-            # i += 0.1
-            # time.sleep(0.1)
+        # update_plot(np.sin(i)*3000 + 4000, np.cos(i)*500 + 3000, 2000)
+        # i += 0.1
+        # time.sleep(0.1)
 
             else:
                 update_plot(None, None, None)
@@ -224,7 +224,12 @@ if __name__ == "__main__":
 
     update_plot(0, 0, 0)
 
-    ser = serial.Serial("/dev/ttyACM0", 9600, timeout=1)
+    # ser = serial.Serial("/dev/ttyACM0", 9600, timeout=1)
+    ser = serial.Serial("COM7", 9600, timeout=1) # Who use this code should change the port name.
+
+    # while True:
+    #     line = ser.readline().decode("utf-8")
+    #     print(line)
 
     try:
         mcu_loop()

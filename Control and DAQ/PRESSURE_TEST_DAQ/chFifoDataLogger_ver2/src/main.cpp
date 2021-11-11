@@ -1,20 +1,32 @@
 #include <arduino.h>
 
 
-const int Pin_button = 1;   
+const int Pin_button = 1;  
+const int Pin_PT = 22; 
 const int Count = 50;
+
+const float a = 0.26115772421664074;
+const float b = -395.4737740445223;
 
 int system_state = 0;
 int i = 0;
 
 int buttonState = 0;
 
+float pressure = -999.9;
+float voltage = -999.9;
 
 void setup(){
 
+  Serial.begin(9600);
+
   while(!Serial){} // Wait for Serial initialization
 
-  pinMode(Pin_button,INPUT); // Pin Mode setup
+  pinMode(Pin_button,INPUT); // Pin Modesetup
+  pinMode(Pin_PT, INPUT); // Pressure pin
+
+  analogReadResolution(13);
+  
 
   // Comment:
   // It seems safer to connect Pin_button with Ground first when starting up.
@@ -43,7 +55,7 @@ void loop(){
 
       // Activate system if count is enough, and keep it.
       system_state = 1; 
-      Serial.printf("Active!\n");
+      // Serial.printf("Active!\n");
 
     }
     else{
@@ -54,6 +66,14 @@ void loop(){
 
     }
     
+    // Read the vol
+    voltage = analogRead(Pin_PT);
+    pressure = a*voltage + b;
+
+    if(pressure<0) pressure = 0.0;
+
+    Serial.printf("100\t%f\t0\t0\t\n",pressure);
+    // Serial.printf("100\t100\t100\t100\t\n");
     // Delay for sometime.
     delay(100);
 }
