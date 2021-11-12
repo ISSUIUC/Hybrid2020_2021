@@ -42,7 +42,8 @@ def init_gui():
     p3_values = deque(np.zeros(plot_size))
 
     # plt.ion()
-    fig = plt.figure(figsize=(20,7))
+    # fig = plt.figure(figsize=(20,7))
+    fig = plt.figure(figsize=(15,5)) #may need to change depending on computer screen size
     ax1 = fig.add_subplot(111)
     ax1.set_title("Pressure Readings")
     ax1.set_xlim(0, plot_size)
@@ -225,7 +226,7 @@ if __name__ == "__main__":
     update_plot(0, 0, 0)
 
     # ser = serial.Serial("/dev/ttyACM0", 9600, timeout=1)
-    ser = serial.Serial("COM7", 9600, timeout=1) # Who use this code should change the port name.
+    ser = serial.Serial("COM6", 9600, timeout=1) # Who use this code should change the port name.
 
     # while True:
     #     line = ser.readline().decode("utf-8")

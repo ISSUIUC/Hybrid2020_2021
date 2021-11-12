@@ -1,10 +1,14 @@
 #include <arduino.h>
 #include <SD.h>
+#include <servo.h>
 
 const int Pin_button = 1;  
-const int Pin_PT = 22; 
+const int Pin_PT = 22; //PT3 is 22, PT2 is 21, PT1 is 20
 const int Count = 50;
 const int FlushPeriod = 100;
+
+Servo myservo;
+const int BallServo = 4;
 
 const int LED1=6,LED2=7,LED3=8,LED4=9;
 
@@ -62,6 +66,9 @@ void setup(){
 
   Serial.printf("Setup Completed\n");
   digitalWrite(LED_BUILTIN, HIGH);
+
+  //Attach myservo to correct pin
+  myservo.attach(BallServo);
 }
 
 
@@ -89,11 +96,9 @@ void loop(){
 
     }
     else{
-
       // Reset in other cases.
       system_state = 0;
       i = 0;
-
     }
 
     if(system_state) digitalWrite(LED2, HIGH);
@@ -102,12 +107,21 @@ void loop(){
     float voltage = analogRead(Pin_PT);
     float pressure = a*voltage + b;
 
-    if(pressure<0) pressure = 0.0;
+    //if(pressure<0) pressure = 0.0;
 
     // Get timestamp
     int timestamp = micros();
 
-    Serial.printf("%d\t%f\t0\t0\t\n",timestamp,pressure);
+    Serial.print(timestamp);
+    Serial.print("\t");
+    Serial.print(pressure);
+    Serial.print("\t");
+    Serial.print("0");
+    Serial.print("\t");
+    Serial.print("0");
+    Serial.print("\t\n");
+    
+
 
     file.print(timestamp);
     file.write(',');
@@ -123,11 +137,26 @@ void loop(){
       FlushCounter += 1;
       digitalWrite(LED1, LOW);
     }
+
+
+    if(Serial.available()){
+      char check = Serial.read();
+      if(check == 'a'){
+        myservo.write(130);
+        //Serial.print(check);
+        digitalWrite(LED3, HIGH);
+
+      }
+      if(check == 'b'){
+        myservo.write(0);
+        //Serial.print(check);
+        digitalWrite(LED3, LOW);
+      }
+    }
   
 
-
     // Serial.printf("100\t100\t100\t100\t\n");
-    // Delay for sometime.
+    // Delay for sometime
     delay(100);
 }
 
