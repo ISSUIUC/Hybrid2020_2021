@@ -8,7 +8,7 @@ const int Count = 50;
 const int FlushPeriod = 100;
 
 Servo myservo;
-const int BallServo = 4;
+const int BallServo = 5;
 
 const int LED1=6,LED2=7,LED3=8,LED4=9;
 

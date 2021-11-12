@@ -226,7 +226,7 @@ if __name__ == "__main__":
     update_plot(0, 0, 0)
 
     # ser = serial.Serial("/dev/ttyACM0", 9600, timeout=1)
-    ser = serial.Serial("COM6", 9600, timeout=1) # Who use this code should change the port name.
+    ser = serial.Serial("COM5", 9600, timeout=1) # Who use this code should change the port name.
 
     # while True:
     #     line = ser.readline().decode("utf-8")
