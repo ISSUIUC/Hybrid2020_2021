@@ -7,8 +7,10 @@ const int Pin_PT = 22; //PT3 is 22, PT2 is 21, PT1 is 20
 const int Count = 50;
 const int FlushPeriod = 100;
 
-Servo myservo;
-const int BallServo = 5;
+Servo myservo1;
+Servo myservo2;
+const int BallServo1 = 5;
+const int BallServo2 = 4;
 
 const int LED1=6,LED2=7,LED3=8,LED4=9;
 
@@ -42,7 +44,7 @@ void setup(){
   pinMode(LED3, OUTPUT);
   pinMode(LED4, OUTPUT);
 
-  analogReadResolution(13);
+  analogReadResolution(12);
 
   // SD card initialization
   
@@ -68,44 +70,18 @@ void setup(){
   digitalWrite(LED_BUILTIN, HIGH);
 
   //Attach myservo to correct pin
-  myservo.attach(BallServo);
+  myservo1.attach(BallServo1);
+  myservo2.attach(BallServo2);
+  myservo1.write(0);
+  myservo2.write(0);
 }
 
 
 
 void loop(){
-
-
-
-    buttonState = digitalRead(Pin_button); // Acquire pin in every loop
-
-    // Serial.printf("%d\n",buttonState); // Used to keep track of the pin status
-
-    if (buttonState == HIGH && i<=Count){
-
-      // Add a count, accumulate to certain value before activate the state.
-      i+=1; 
-
-    }
-    else if (buttonState == HIGH && i>Count)
-    {
-
-      // Activate system if count is enough, and keep it.
-      system_state = 1; 
-      // Serial.printf("Active!\n");
-
-    }
-    else{
-      // Reset in other cases.
-      system_state = 0;
-      i = 0;
-    }
-
-    if(system_state) digitalWrite(LED2, HIGH);
-    
     // Read the volt and convert to pressure
     float voltage = analogRead(Pin_PT);
-    float pressure = a*voltage + b;
+    float pressure = a*voltage*2 + b;
 
     //if(pressure<0) pressure = 0.0;
 
@@ -142,13 +118,15 @@ void loop(){
     if(Serial.available()){
       char check = Serial.read();
       if(check == 'a'){
-        myservo.write(130);
+        myservo1.write(105);
+        myservo2.write(105);
         //Serial.print(check);
         digitalWrite(LED3, HIGH);
 
       }
       if(check == 'b'){
-        myservo.write(0);
+        myservo1.write(0);
+        myservo2.write(0);
         //Serial.print(check);
         digitalWrite(LED3, LOW);
       }
