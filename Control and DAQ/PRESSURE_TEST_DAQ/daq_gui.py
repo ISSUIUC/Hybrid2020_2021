@@ -169,6 +169,8 @@ def _quit():
     root.destroy()
     sys.exit()
 
+out_file = open("Data.csv", "at")
+
 def mcu_loop():
 
     i = 0
@@ -182,6 +184,8 @@ def mcu_loop():
 
             if data:
                 tStamp, val1, val2, val3 = data.split("\t")
+                out_file.write(f"{tStamp},{val1}\n")
+                out_file.flush()
 
                 # print("Timestamp:{}\tPressure1:{}\tPressure2:{}\tPressure3:{}"
                 # .format(tStamp, val1, val2, val3))
@@ -211,7 +215,7 @@ def mcu_loop():
             ser.flush()
 
         end = time.time()
-        print("Refresh Rate: " + str(1/(end-start)) + " Hz")
+        # print("Refresh Rate: " + str(1/(end-start)) + " Hz")
 
 
 if __name__ == "__main__":
@@ -226,7 +230,7 @@ if __name__ == "__main__":
     update_plot(0, 0, 0)
 
     # ser = serial.Serial("/dev/ttyACM0", 9600, timeout=1)
-    ser = serial.Serial("COM5", 9600, timeout=1) # Who use this code should change the port name.
+    ser = serial.Serial("COM4", 9600, timeout=1) # Who use this code should change the port name.
 
     # while True:
     #     line = ser.readline().decode("utf-8")
