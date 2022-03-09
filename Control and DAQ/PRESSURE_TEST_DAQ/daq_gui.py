@@ -1,3 +1,4 @@
+from datetime import date
 import sys, time, serial, matplotlib, random
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -169,7 +170,7 @@ def _quit():
     root.destroy()
     sys.exit()
 
-out_file = open("Data.csv", "at")
+out_file = open(f"${date.today()}Data.csv", "at")
 
 def mcu_loop():
 
@@ -230,7 +231,7 @@ if __name__ == "__main__":
     update_plot(0, 0, 0)
 
     # ser = serial.Serial("/dev/ttyACM0", 9600, timeout=1)
-    ser = serial.Serial("COM4", 9600, timeout=1) # Who use this code should change the port name.
+    ser = serial.Serial("COM12", 9600, timeout=1) # Who use this code should change the port name.
 
     # while True:
     #     line = ser.readline().decode("utf-8")
