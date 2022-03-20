@@ -1,3 +1,4 @@
+from datetime import date
 import sys, time, serial, matplotlib, random
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -42,12 +43,13 @@ def init_gui():
     p3_values = deque(np.zeros(plot_size))
 
     # plt.ion()
-    fig = plt.figure(figsize=(20,7))
+    # fig = plt.figure(figsize=(20,7))
+    fig = plt.figure(figsize=(15,5)) #may need to change depending on computer screen size
     ax1 = fig.add_subplot(111)
     ax1.set_title("Pressure Readings")
     ax1.set_xlim(0, plot_size)
-    ax1.set_ylim(0, 8300)
-    ax1.set_yticks([0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000])
+    ax1.set_ylim(0, 1100)
+    ax1.set_yticks([0, 100, 200, 300, 400, 500, 600, 700, 800,900,1000,1100])
     ax1.axhline(8192, color="r", linestyle="--", linewidth=0.7)
     line1, = ax1.plot(x_values, p1_values, 'r-', linewidth=0.6)
     line2, = ax1.plot(x_values, p2_values, 'g-', linewidth=0.6)
@@ -168,6 +170,8 @@ def _quit():
     root.destroy()
     sys.exit()
 
+out_file = open(f"${date.today()}Data.csv", "at")
+
 def mcu_loop():
 
     i = 0
@@ -181,22 +185,24 @@ def mcu_loop():
 
             if data:
                 tStamp, val1, val2, val3 = data.split("\t")
+                out_file.write(f"{tStamp},{val1}\n")
+                out_file.flush()
 
                 # print("Timestamp:{}\tPressure1:{}\tPressure2:{}\tPressure3:{}"
                 # .format(tStamp, val1, val2, val3))
 
                 # plot_start = time.time()
 
-                update_plot(int(val1), int(val2), int(val3))
+                update_plot(float(val1) + 15, float(val2), float(val3))
 
                 # plot_end = time.time()
                 # print("Plot Max Refresh Rate: " + str(1/(plot_end-plot_start)) + " Hz")
 
                 ser.flush()
 
-            # update_plot(np.sin(i)*3000 + 4000, np.cos(i)*500 + 3000, 2000)
-            # i += 0.1
-            # time.sleep(0.1)
+        # update_plot(np.sin(i)*3000 + 4000, np.cos(i)*500 + 3000, 2000)
+        # i += 0.1
+        # time.sleep(0.1)
 
             else:
                 update_plot(None, None, None)
@@ -210,7 +216,7 @@ def mcu_loop():
             ser.flush()
 
         end = time.time()
-        print("Refresh Rate: " + str(1/(end-start)) + " Hz")
+        # print("Refresh Rate: " + str(1/(end-start)) + " Hz")
 
 
 if __name__ == "__main__":
@@ -224,7 +230,12 @@ if __name__ == "__main__":
 
     update_plot(0, 0, 0)
 
-    ser = serial.Serial("/dev/ttyACM0", 9600, timeout=1)
+    # ser = serial.Serial("/dev/ttyACM0", 9600, timeout=1)
+    ser = serial.Serial("COM12", 9600, timeout=1) # Who use this code should change the port name.
+
+    # while True:
+    #     line = ser.readline().decode("utf-8")
+    #     print(line)
 
     try:
         mcu_loop()
