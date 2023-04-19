@@ -1,140 +1,94 @@
-#include <arduino.h>
-#include <SD.h>
-#include <servo.h>
+/*
+ Setup your scale and start the sketch WITHOUT a weight on the scale
+ Once readings are displayed place the weight on the scale
+ Press +/- or a/z to adjust the calibration_factor until the output readings match the known weight
+ Arduino pin 6 -> HX711 CLK
+ Arduino pin 5 -> HX711 DOUT
+ Arduino pin 5V -> HX711 VCC
+ Arduino pin GND -> HX711 GND 
+*/
 
-const int Pin_button = 1;  
-const int Pin_PT = 22; //PT3 is 22, PT2 is 21, PT1 is 20
-const int Count = 50;
-const int FlushPeriod = 100;
+#include "HX711.h"
+#include <Servo.h>
 
-Servo myservo1;
-Servo myservo2;
-const int BallServo1 = 5;
-const int BallServo2 = 4;
+Servo s1, s2;
 
-const int LED1=6,LED2=7,LED3=8,LED4=9;
-
-int FlushCounter = 0;
+HX711 scale(4, 5);
 
 const float a = 0.26115772421664074;
 const float b = -395.4737740445223;
+constexpr int OPEN_DEGREES = 140;
+constexpr int CLOSE_DEGREES = 0;
 
-int system_state = 0;
-int i = 0;
+float calibration_factor = -2.381; // this calibration factor is adjusted according to my load cell
+float units;
+float ounces;
 
-int buttonState = 0;
-
-File file; // For saving data into SD card file.
-
-// SD file definitions.
-const uint8_t sdChipSelect = BUILTIN_SDCARD;
-
-void setup(){
-
+void setup() {
   Serial.begin(9600);
-
-  while(!Serial){} // Wait for Serial initialization
-
-  pinMode(Pin_button,INPUT); // Pin Modesetup
-  pinMode(Pin_PT, INPUT); // Pressure pin
-
-  pinMode(LED_BUILTIN, OUTPUT); // LED PIN // 6 7 8 9 
-  pinMode(LED1, OUTPUT);
-  pinMode(LED2, OUTPUT);
-  pinMode(LED3, OUTPUT);
-  pinMode(LED4, OUTPUT);
-
-  analogReadResolution(12);
-
-  // SD card initialization
   
-  // Open file.
-  if (!SD.begin(sdChipSelect)) {
-    Serial.println(F("SD begin failed."));
-    while (true) {}
-  }
-  file = SD.open("0218B.CSV", O_CREAT | O_WRITE | O_TRUNC);
-  if (!file) {
-    
-    Serial.println(F("file open failed."));
-    while (true) {}
-  }
-  
+  pinMode(A0, INPUT);
+  pinMode(A1, INPUT);
+  s1.attach(7);
+  s2.attach(8);
+  s1.write(CLOSE_DEGREES);
+  s2.write(CLOSE_DEGREES);
+//  Serial.println("HX711 calibration sketch");
+//  Serial.println("Remove all weight from scale");
+//  Serial.println("After readings begin, place known weight on scale");
+//  Serial.println("Press + or a to increase calibration factor");
+//  Serial.println("Press - or z to decrease calibration factor");
 
-  // Comment:
-  // It seems safer to connect Pin_button with Ground first when starting up.
-  // USB connections seem to provide Ground, but without USB its hard to say...
-  // DON'T TOUCH ON THE CONNECTION (Sometimes I am charged)!
+  scale.set_scale();
+  scale.tare();  //Reset the scale to 0
 
-  Serial.printf("Setup Completed\n");
-  digitalWrite(LED_BUILTIN, HIGH);
-
-  //Attach myservo to correct pin
-  myservo1.attach(BallServo1);
-  myservo2.attach(BallServo2);
-  myservo1.write(0);
-  myservo2.write(0);
+  long zero_factor = scale.read_average(); //Get a baseline reading
+//  Serial.print("Zero factor: "); //This can be used to remove the need to tare the scale. Useful in permanent scale projects.
+//  Serial.println(zero_factor);
 }
 
+void loop() {
+  delay(10);
+  scale.set_scale(calibration_factor); //Adjust to this calibration factor
 
+//  Serial.print("Reading: ");
+  units = scale.get_units(), 10;
+  if (units < 0)
+  {
+    units = 0.00;
+  } 
+  ounces = units * 0.035274;
 
-void loop(){
-    // Read the volt and convert to pressure
-    float voltage = analogRead(Pin_PT);
-    float pressure = a*voltage*2 + b;
+  float voltage1 = analogRead(A0);
+  float pressure1 = voltage1*8*a + b;
+  float voltage2 = analogRead(A1);
+  float pressure2 = voltage2*8*a + b;
+  float voltage3 = analogRead(A2);
+  float pressure3 = voltage3*8*a + b;
+  Serial.print(millis());
+  Serial.print('\t');
+  Serial.print(units);
+  Serial.print('\t');
+  Serial.print(pressure1);
+  Serial.print('\t');
+  Serial.print(pressure2);
+//  Serial.print('\t');
+//  Serial.print(pressure3);
+  Serial.println();
+//  Serial.print(" grams"); 
+//  Serial.print(" calibration_factor: ");
+//  Serial.print(calibration_factor);
+ 
 
-    //if(pressure<0) pressure = 0.0;
-
-    // Get timestamp
-    int timestamp = micros();
-
-    Serial.print(timestamp);
-    Serial.print("\t");
-    Serial.print(pressure);
-    Serial.print("\t");
-    Serial.print("0");
-    Serial.print("\t");
-    Serial.print("0");
-    Serial.print("\t\n");
-    
-
-
-    file.print(timestamp);
-    file.write(',');
-    file.print(pressure);
-    file.println();
-
-    if(FlushCounter >= FlushPeriod){
-      file.flush();
-      FlushCounter = 0;
-      digitalWrite(LED1, HIGH);
+  if(Serial.available())
+  {
+    char temp = Serial.read();
+    if(temp == 'a'){
+      s1.write(CLOSE_DEGREES);
+      s2.write(CLOSE_DEGREES);
+    } else if(temp == 'b'){
+      s1.write(OPEN_DEGREES);
+      s2.write(OPEN_DEGREES);
     }
-    else{
-      FlushCounter += 1;
-      digitalWrite(LED1, LOW);
-    }
-
-
-    if(Serial.available()){
-      char check = Serial.read();
-      if(check == 'a'){
-        myservo1.write(105);
-        myservo2.write(105);
-        //Serial.print(check);
-        digitalWrite(LED3, HIGH);
-
-      }
-      if(check == 'b'){
-        myservo1.write(0);
-        myservo2.write(0);
-        //Serial.print(check);
-        digitalWrite(LED3, LOW);
-      }
-    }
-  
-
-    // Serial.printf("100\t100\t100\t100\t\n");
-    // Delay for sometime
-    delay(100);
+  }
 }
-
