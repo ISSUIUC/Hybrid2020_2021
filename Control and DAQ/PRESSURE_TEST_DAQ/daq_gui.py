@@ -1,8 +1,12 @@
+import asyncio
 from datetime import date
+from json import JSONEncoder
 import sys, time, serial, matplotlib, random
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from collections import deque
+from serialemu import SerialEMU
+from server import TelemetryServer
 
 import numpy as np
 
@@ -108,22 +112,31 @@ def init_gui():
 
     primary_frame.pack()
 
+def close_ball_valve():
+    global ser
+    global BALL_VALVE_OPEN
+    
+    ser.write("a".encode("utf-8"))
+    daq_toggle_button.config({"background" : "red"})
+    daq_toggle_button.config({"justify" : "center"})
+    BALL_VALVE_OPEN = False
+
+def open_ball_valve():
+    global ser
+    global BALL_VALVE_OPEN
+
+    ser.write("b".encode("utf-8"))
+    daq_toggle_button.config({"background" : "green3"})
+    daq_toggle_button.config({"justify" : "center"})
+    BALL_VALVE_OPEN = True
 
 def daq_toggle():
-    global ser
-    global DAQ_ENABLE
+    global BALL_VALVE_OPEN
 
-    if DAQ_ENABLE:
-        ser.write("b".encode("utf-8"))
-        daq_toggle_button.config({"background" : "red"})
-        daq_toggle_button.config({"justify" : "center"})
-        DAQ_ENABLE = False
+    if BALL_VALVE_OPEN:
+        close_ball_valve()
     else:
-        ser.write("a".encode("utf-8"))
-        daq_toggle_button.config({"background" : "green3"})
-        daq_toggle_button.config({"justify" : "center"})
-        DAQ_ENABLE = True
-
+        open_ball_valve()
 
 def update_plot(new_p1, new_p2, new_p3):
 
@@ -172,72 +185,56 @@ def _quit():
 
 out_file = open(f"${date.today()}Data.csv", "at")
 
-def mcu_loop():
-
-    i = 0
-
+async def mcu_loop():
     while True:
-        start = time.time()
-
+        await asyncio.sleep(0.01)
         try:
             data = str(ser.readline()[:-2].decode("utf-8"))
             ser.flush()
-
             if data:
                 tStamp, val1, val2, val3 = data.split("\t")
-                out_file.write(f"{tStamp},{val1}\n")
+                a = 1.36089
+                b = 206.801
+                val2 = float(val2)*a+b
+                val3 = float(val3)*a+b
+                out_file.write(f"{tStamp},{val1},{val2},{val3}\n")
                 out_file.flush()
 
-                # print("Timestamp:{}\tPressure1:{}\tPressure2:{}\tPressure3:{}"
-                # .format(tStamp, val1, val2, val3))
-
-                # plot_start = time.time()
-
-                update_plot(float(val1) + 15, float(val2), float(val3))
-
-                # plot_end = time.time()
-                # print("Plot Max Refresh Rate: " + str(1/(plot_end-plot_start)) + " Hz")
+                update_plot(float(val1), float(val2), float(val3))
+                telem_server.update_data(JSONEncoder().encode({'Force': val1, 'Pressure1': val2, 'Pressure2': val3, 'BallVale': "Open" if BALL_VALVE_OPEN else "Closed"}))
 
                 ser.flush()
-
-        # update_plot(np.sin(i)*3000 + 4000, np.cos(i)*500 + 3000, 2000)
-        # i += 0.1
-        # time.sleep(0.1)
 
             else:
                 update_plot(None, None, None)
 
-
-        except KeyboardInterrupt:
-            ser.flush()
-            ser.write("stahp".encode("utf-8"))
-
         except ValueError:
             ser.flush()
-
-        end = time.time()
-        # print("Refresh Rate: " + str(1/(end-start)) + " Hz")
 
 
 if __name__ == "__main__":
 
     global ser
-    global DAQ_ENABLE
+    global BALL_VALVE_OPEN
 
-    DAQ_ENABLE = False
+    BALL_VALVE_OPEN = False
 
     init_gui()
 
     update_plot(0, 0, 0)
 
     # ser = serial.Serial("/dev/ttyACM0", 9600, timeout=1)
-    ser = serial.Serial("COM12", 9600, timeout=1) # Who use this code should change the port name.
+    ser = serial.Serial("COM4", 9600, timeout=1) # Who use this code should change the port name.
 
-    # while True:
-    #     line = ser.readline().decode("utf-8")
-    #     print(line)
+    # ser = SerialEMU()
+    telem_server = TelemetryServer() 
+    telem_server.add_close_listener(close_ball_valve)
+    telem_server.add_open_listener(open_ball_valve)
 
     try:
-        mcu_loop()
+        loop = asyncio.get_event_loop()
+        loop.create_task(telem_server.start(80))
+        loop.create_task(mcu_loop())
+        loop.run_forever();
     except KeyboardInterrupt:
         sys.exit()
